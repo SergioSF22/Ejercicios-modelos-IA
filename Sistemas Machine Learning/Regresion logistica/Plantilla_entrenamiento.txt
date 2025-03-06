@@ -1,0 +1,131 @@
+# --------------------
+# MÉTODOS DE BALANCEO DE CLASES
+# --------------------
+# 1. Sobremuestreo aleatorio
+ros = RandomOverSampler(random_state=42)
+X_train_ros, y_train_ros = ros.fit_resample(X_train, y_train)
+
+# 2. SMOTE (Synthetic Minority Over-sampling Technique)
+smote = SMOTE(random_state=42)
+X_train_smote, y_train_smote = smote.fit_resample(X_train, y_train)
+
+# 3. Submuestreo aleatorio
+rus = RandomUnderSampler(random_state=42)
+X_train_rus, y_train_rus = rus.fit_resample(X_train, y_train)
+
+# 4. NearMiss (submuestreo basado en distancia)
+nearmiss = NearMiss()
+X_train_nm, y_train_nm = nearmiss.fit_resample(X_train, y_train)
+
+# --------------------
+# EVALUACIÓN DE MÉTODOS DE BALANCEO
+# --------------------
+resultados_balanceo = {}
+
+def evaluar_balanceo(X_train_resampled, y_train_resampled, metodo):
+    # Creación del modelo de RL
+    model = LogisticRegression(C=0.1, solver='liblinear', max_iter=500)
+    # Entreno el modelo con los datos de cada modelo
+    model.fit(X_train_resampled, y_train_resampled)
+    # Realizo predicciones con el modelo
+    y_pred = model.predict(X_test)
+    # Calculo la precisión del modelo sacando las métricas
+    f1 = f1_score(y_test, y_pred) * 100
+    auc = roc_auc_score(y_test, model.predict_proba(X_test)[:,1]) * 100
+    resultados_balanceo[metodo] = (f1, auc)
+    # Imprimimos los resultados
+    print(f"\nResultados con {metodo}:")
+    print(f"Accuracy: {accuracy_score(y_test, y_pred) * 100:.2f}%")
+    print(f"Precision: {precision_score(y_test, y_pred) * 100:.2f}%")
+    print(f"Recall: {recall_score(y_test, y_pred) * 100:.2f}%")
+    print(f"F1-Score: {f1:.2f}%")
+    print(f"AUC-ROC: {auc:.2f}%")
+
+evaluar_balanceo(X_train_ros, y_train_ros, "Sobremuestreo Aleatorio")
+evaluar_balanceo(X_train_smote, y_train_smote, "SMOTE")
+evaluar_balanceo(X_train_rus, y_train_rus, "Submuestreo Aleatorio")
+evaluar_balanceo(X_train_nm, y_train_nm, "NearMiss")
+
+# Seleccionar el mejor método de balanceo
+mejor_metodo = max(resultados_balanceo, key=lambda k: resultados_balanceo[k])
+print(f"\nEl mejor método de balanceo es: {mejor_metodo} con F1-Score: {resultados_balanceo[mejor_metodo][0]:.2f}% y AUC-ROC: {resultados_balanceo[mejor_metodo][1]:.2f}%")
+
+# Obtener los datos balanceados del mejor método encontrado
+if mejor_metodo == "Sobremuestreo Aleatorio":
+    X_train_resampled, y_train_resampled = X_train_ros, y_train_ros
+elif mejor_metodo == "SMOTE":
+    X_train_resampled, y_train_resampled = X_train_smote, y_train_smote
+elif mejor_metodo == "Submuestreo Aleatorio":
+    X_train_resampled, y_train_resampled = X_train_rus, y_train_rus
+elif mejor_metodo == "NearMiss":
+    X_train_resampled, y_train_resampled = X_train_nm, y_train_nm
+
+# --------------------
+# MÉTODO 1: Ajuste manual de hiperparámetros
+# --------------------
+manual_model = LogisticRegression(C=0.1, solver='liblinear', max_iter=500)  # Ejemplo de hiperparámetros ajustados manualmente
+manual_model.fit(X_train_resampled, y_train_resampled)  # Entrenar modelo
+
+# Predicciones
+y_pred_manual = manual_model.predict(X_test)
+
+# Evaluación del modelo ajustado manualmente
+print("\nResultados con ajuste manual de hiperparámetros:")
+print(f"Accuracy: {accuracy_score(y_test, y_pred_manual) * 100:.2f}%")
+print(f"Precision: {precision_score(y_test, y_pred_manual) * 100:.2f}%")
+print(f"Recall: {recall_score(y_test, y_pred_manual) * 100:.2f}%")
+print(f"F1-Score: {f1_score(y_test, y_pred_manual) * 100:.2f}%")
+print(f"AUC-ROC: {roc_auc_score(y_test, manual_model.predict_proba(X_test)[:,1]) * 100:.2f}%")
+
+# --------------------
+# MÉTODO 2: Ajuste automático con GridSearchCV
+# --------------------
+parametros = {
+    "C": [0.001, 0.01, 0.1, 1, 10, 100],  # Diferentes valores de regularización
+    "solver": ["liblinear", "lbfgs"]  # Diferentes algoritmos de optimización
+}
+
+# Configurar GridSearchCV
+grid_search = GridSearchCV(LogisticRegression(max_iter=500), parametros, cv=5, scoring="accuracy", n_jobs=-1)
+
+grid_search.fit(X_train_resampled, y_train_resampled)  # Entrenar búsqueda de hiperparámetros
+
+# Mejor modelo encontrado
+best_model = grid_search.best_estimator_
+
+# Predicciones del mejor modelo
+y_pred_best = best_model.predict(X_test)
+
+# Evaluación del mejor modelo
+print("\nResultados con ajuste automático de hiperparámetros:")
+print(f"Mejores parámetros: {grid_search.best_params_}")
+print(f"Mejor Accuracy en validación cruzada: {grid_search.best_score_ * 100:.2f}%")
+print(f"Accuracy: {accuracy_score(y_test, y_pred_best) * 100:.2f}%")
+print(f"Precision: {precision_score(y_test, y_pred_best) * 100:.2f}%")
+print(f"Recall: {recall_score(y_test, y_pred_best) * 100:.2f}%")
+print(f"F1-Score: {f1_score(y_test, y_pred_best) * 100:.2f}%")
+print(f"AUC-ROC: {roc_auc_score(y_test, best_model.predict_proba(X_test)[:,1]) * 100:.2f}%")
+
+
+# --------------------
+# ENTRENAMIENTO FINAL Y EVALUACIÓN
+# --------------------
+
+# Entrenar el mejor modelo con los datos balanceados
+best_model.fit(X_train_resampled, y_train_resampled)
+
+# Realizar predicciones finales con el mejor modelo y el mejor balanceo
+y_pred_final = best_model.predict(X_test)
+
+# Crear DataFrame de resultados
+resultados = pd.DataFrame({
+    "Real": y_test.values,
+    "Predicción": y_pred_final
+})
+
+# Mapear valores 0 y 1 a etiquetas comprensibles
+resultados["Real"] = resultados["Real"].map({0: "Benigno", 1: "Maligno"})
+resultados["Predicción"] = resultados["Predicción"].map({0: "Benigno", 1: "Maligno"})
+
+# Mostrar las primeras filas de la tabla
+print(resultados.head(10))
