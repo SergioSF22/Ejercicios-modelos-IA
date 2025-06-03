@@ -19,7 +19,7 @@ X_train_nm, y_train_nm = nearmiss.fit_resample(X_train, y_train)
 
 # --------------------
 # EVALUACIÓN DE MÉTODOS DE BALANCEO
-# --------------------
+# --------------------wha
 resultados_balanceo = {}
 
 def evaluar_balanceo(X_train_resampled, y_train_resampled, metodo):
